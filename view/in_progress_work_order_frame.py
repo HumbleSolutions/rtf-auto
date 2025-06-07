@@ -89,17 +89,33 @@ class InProgressWorkOrderFrame(BaseFrame):
         self.notes_text.delete("1.0", "end")
         self.notes_text.insert("1.0", self.db.get_notes_for_work_order(self.work_order_id))
 
+        # Parts
         self.parts_tree.delete(*self.parts_tree.get_children())
-        for row in self.db.get_parts_for_work_order(self.work_order_id):
+        parts = self.db.get_parts_for_work_order(self.work_order_id)
+        for row in parts:
             total = float(row[2]) * float(row[3])
             self.parts_tree.insert("", "end", values=(row[0], row[1], row[2], f"${row[3]:.2f}", f"${total:.2f}"))
+        part_total = sum(float(row[4]) for row in parts)
 
+        # Hours
         self.hours_tree.delete(*self.hours_tree.get_children())
-        total = 0.0
-        for row in self.db.get_mechanic_hours(self.work_order_id):
+        hours = self.db.get_mechanic_hours(self.work_order_id)
+        total_hours = 0.0
+        for row in hours:
             self.hours_tree.insert("", "end", values=row)
-            total += float(row[2])
-        self.total_hours_var.set(f"Total Hours: {total:.2f}")
+            total_hours += float(row[2])
+        self.total_hours_var.set(f"Total Hours: {total_hours:.2f}")
+
+        # Subtotal
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT rate FROM work_orders WHERE id = ?", (self.work_order_id,))
+        row = cursor.fetchone()
+        conn.close()
+        rate = float(row[0]) if row else 0.0
+        labor_total = total_hours * rate
+        subtotal = part_total + labor_total
+        self.subtotal_var.set(f"Work Order Subtotal: ${subtotal:.2f}")
 
     def _go_back(self):
         from view.in_progress_work_order_list_frame import InProgressOrdersListFrame
@@ -217,3 +233,22 @@ class InProgressWorkOrderFrame(BaseFrame):
             self.mech_hours.insert(0, values[2])
             self.mech_date.delete(0, "end")
             self.mech_date.insert(0, values[3])
+
+    def calculate_subtotal(self):
+        parts = self.db.get_parts_for_work_order(self.work_order_id)
+        part_total = sum(float(row[4]) for row in parts)
+
+        hours = self.db.get_mechanic_hours(self.work_order_id)
+        total_hours = sum(float(row[2]) for row in hours)
+
+        # Get hourly rate from work_order
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT rate FROM work_orders WHERE id = ?", (self.work_order_id,))
+        row = cursor.fetchone()
+        conn.close()
+        rate = float(row[0]) if row else 0.0
+
+        labor_total = total_hours * rate
+        subtotal = part_total + labor_total
+        self.subtotal_var.set(f"Work Order Subtotal: ${subtotal:.2f}")

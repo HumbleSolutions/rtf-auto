@@ -136,4 +136,4 @@ Want to customize this for your own shop? Fork away!
 
 ## 📜 License
 
-MIT License — © 2025 [Your Name or Company]
+MIT License — © 2025 [HumbleSolutions]

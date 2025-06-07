@@ -341,3 +341,13 @@ class DBManager:
         cursor.execute("DELETE FROM work_order_services WHERE work_order_id = ?", (work_order_id,))
         conn.commit()
         conn.close()
+
+    def validate_user(self, uid, pwd):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM users WHERE username = ? AND password = ?", (uid, pwd))
+        result = cursor.fetchone()
+        conn.close()
+        if result:
+            return True, result[0]  # (is_valid, role)
+        return False, None

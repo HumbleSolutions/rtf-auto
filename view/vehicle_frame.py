@@ -25,7 +25,8 @@ class VehicleFrame(BaseFrame):
         ttk.Button(filter_bar, text="Apply", command=self._filter_vehicles).pack(side="left", padx=2)
         ttk.Button(filter_bar, text="Clear", command=self._clear_filter).pack(side="left", padx=2)
 
-        self.tree = ttk.Treeview(self, columns=("ID", "Owner", "Make", "Model", "Year", "VIN"), show="headings")
+        self.tree = ttk.Treeview(self, columns=("ID", "Owner", "Make", "Model", "Year", "VIN", "KM"), show="headings")
+
         for col in self.tree["columns"]:
             self.tree.heading(col, text=col)
             self.tree.column(col, width=120)
@@ -51,6 +52,9 @@ class VehicleFrame(BaseFrame):
         self.year_entry.grid(row=1, column=3, padx=5)
         ttk.Label(form, text="VIN").grid(row=0, column=4)
         self.vin_entry.grid(row=1, column=4, padx=5)
+        self.odometer_entry = ttk.Entry(form)
+        ttk.Label(form, text="Odometer (KM)").grid(row=0, column=5)
+        self.odometer_entry.grid(row=1, column=5, padx=5)
 
         btns = ttk.Frame(self)
         btns.pack(pady=10)
@@ -67,18 +71,30 @@ class VehicleFrame(BaseFrame):
         self._clear_form()
 
     def _load_customers(self):
+        self.customer_id_map = {}
         self.customers = DBManager().get_customer_list()
-        self.customer_var['values'] = [f"{id} - {name}" for id, name, *_ in self.customers]
+        
+        display_names = []
+        for cust_id, full_name, *_ in self.customers:
+            display_names.append(full_name)
+            self.customer_id_map[full_name] = cust_id  # ✅ link name to ID
+
+        self.customer_var['values'] = display_names
+
+
+
+
 
     def _get_selected_customer_id(self):
-        if self.customer_var.get():
-            return int(self.customer_var.get().split(" - ")[0])
-        return None
+        return self.customer_id_map.get(self.customer_var.get(), None)
+
 
     def _on_select(self, event):
         selected = self.tree.focus()
         if selected:
             data = self.tree.item(selected, "values")
+            self.selected_vehicle_id = int(data[0])  # ✅ THIS IS CRUCIAL
+
             self.customer_var.set(data[1])
             self.make_entry.delete(0, "end")
             self.make_entry.insert(0, data[2])
@@ -88,6 +104,9 @@ class VehicleFrame(BaseFrame):
             self.year_entry.insert(0, data[4])
             self.vin_entry.delete(0, "end")
             self.vin_entry.insert(0, data[5])
+            self.odometer_entry.delete(0, "end")
+            self.odometer_entry.insert(0, data[6])
+
 
     def _clear_form(self):
         for field in [self.make_entry, self.model_entry, self.year_entry, self.vin_entry]:
@@ -101,26 +120,40 @@ class VehicleFrame(BaseFrame):
                 self.make_entry.get(),
                 self.model_entry.get(),
                 self.year_entry.get(),
-                self.vin_entry.get()
+                self.vin_entry.get(),
+                int(self.odometer_entry.get() or 0)
+
+                
             )
             self.refresh_data()
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
     def _update_vehicle(self):
-        selected = self.tree.focus()
-        if not selected:
+        vehicle_id = getattr(self, "selected_vehicle_id", None)
+        if vehicle_id is None:
+            messagebox.showerror("Error", "Select a vehicle to update first.")
             return
-        vehicle_id = self.tree.item(selected, "values")[0]
-        DBManager().update_vehicle(
-            vehicle_id,
-            self._get_selected_customer_id(),
-            self.make_entry.get(),
-            self.model_entry.get(),
-            self.year_entry.get(),
-            self.vin_entry.get()
-        )
-        self.refresh_data()
+
+        customer_id = self._get_selected_customer_id()
+        if customer_id is None:
+            messagebox.showerror("Invalid Customer", "Please select a valid customer.")
+            return
+
+        try:
+            DBManager().update_vehicle(
+                vehicle_id,
+                customer_id,
+                self.make_entry.get(),
+                self.model_entry.get(),
+                self.year_entry.get(),
+                self.vin_entry.get(),
+                int("".join(filter(str.isdigit, self.odometer_entry.get())) or 0)
+            )
+            self.refresh_data()
+        except Exception as e:
+            messagebox.showerror("Update Failed", str(e))
+
 
     def _delete_vehicle(self):
         selected = self.tree.focus()

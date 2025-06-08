@@ -17,6 +17,11 @@ class DBManager:
         conn = self.get_connection()
         cursor = conn.cursor()
 
+        cursor.execute("PRAGMA table_info(vehicles)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if "odometer_km" not in columns:
+            cursor.execute("ALTER TABLE vehicles ADD COLUMN odometer_km INTEGER DEFAULT 0")
+
         # USERS
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -47,6 +52,7 @@ class DBManager:
                 model TEXT,
                 year TEXT,
                 vin TEXT,
+                odometer_km INTEGER DEFAULT 0,
                 FOREIGN KEY(customer_id) REFERENCES customers(id)
             )
         """)
@@ -298,7 +304,9 @@ class DBManager:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT v.id, c.first_name || ' ' || c.last_name AS owner_name, v.make, v.model, v.year, v.vin
+            SELECT v.id,
+                c.first_name || ' ' || c.last_name AS owner_name,
+                v.make, v.model, v.year, v.vin, v.odometer_km
             FROM vehicles v
             JOIN customers c ON v.customer_id = c.id
             ORDER BY v.year DESC
@@ -307,13 +315,14 @@ class DBManager:
         conn.close()
         return results
 
-    def add_vehicle(self, customer_id, make, model, year, vin):
+
+    def add_vehicle(self, customer_id, make, model, year, vin, odometer_km):
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO vehicles (customer_id, make, model, year, vin)
-            VALUES (?, ?, ?, ?, ?)
-        """, (customer_id, make, model, year, vin))
+            INSERT INTO vehicles (customer_id, make, model, year, vin, odometer_km)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (customer_id, make, model, year, vin, odometer_km))
         conn.commit()
         conn.close()
 
@@ -351,3 +360,14 @@ class DBManager:
         if result:
             return True, result[0]  # (is_valid, role)
         return False, None
+    
+    def update_vehicle(self, vehicle_id, customer_id, make, model, year, vin, odometer_km):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE vehicles
+            SET customer_id = ?, make = ?, model = ?, year = ?, vin = ?, odometer_km = ?
+            WHERE id = ?
+        """, (customer_id, make, model, year, vin, odometer_km, vehicle_id))
+        conn.commit()
+        conn.close()

@@ -93,6 +93,17 @@ class DBManager:
                 FOREIGN KEY(work_order_id) REFERENCES work_orders(id)
             )
         """)
+        # VIN Cache
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS vin_cache (
+                vin TEXT PRIMARY KEY,
+                make TEXT,
+                model TEXT,
+                year TEXT,
+                cached_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
 
         # PARTS
         cursor.execute("""
@@ -369,5 +380,24 @@ class DBManager:
             SET customer_id = ?, make = ?, model = ?, year = ?, vin = ?, odometer_km = ?
             WHERE id = ?
         """, (customer_id, make, model, year, vin, odometer_km, vehicle_id))
+        conn.commit()
+        conn.close()
+
+    def get_cached_vin(self, vin):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT make, model, year FROM vin_cache WHERE vin = ?", (vin,))
+        row = cursor.fetchone()
+        conn.close()
+        return row if row else None
+    
+    
+    def cache_vin(self, vin, make, model, year):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO vin_cache (vin, make, model, year)
+            VALUES (?, ?, ?, ?)
+        """, (vin, make, model, year))
         conn.commit()
         conn.close()

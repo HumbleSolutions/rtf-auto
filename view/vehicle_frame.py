@@ -2,6 +2,7 @@
 from view.base_frame import BaseFrame
 from tkinter import ttk, messagebox
 from model.db_manager import DBManager
+import requests
 
 class VehicleFrame(BaseFrame):
     def __init__(self, master, controller):
@@ -37,9 +38,9 @@ class VehicleFrame(BaseFrame):
         form.pack(pady=5)
 
         self.customer_var = ttk.Combobox(form, state="readonly")
-        self.make_entry = ttk.Entry(form)
-        self.model_entry = ttk.Entry(form)
-        self.year_entry = ttk.Entry(form)
+        self.make_entry = ttk.Entry(form, state="readonly")
+        self.model_entry = ttk.Entry(form, state="readonly")
+        self.year_entry = ttk.Entry(form, state="readonly")
         self.vin_entry = ttk.Entry(form)
 
         ttk.Label(form, text="Customer").grid(row=0, column=0)
@@ -50,11 +51,18 @@ class VehicleFrame(BaseFrame):
         self.model_entry.grid(row=1, column=2, padx=5)
         ttk.Label(form, text="Year").grid(row=0, column=3)
         self.year_entry.grid(row=1, column=3, padx=5)
-        ttk.Label(form, text="VIN").grid(row=0, column=4)
-        self.vin_entry.grid(row=1, column=4, padx=5)
+        ttk.Label(form, text="Odometer (KM)").grid(row=0, column=4)
         self.odometer_entry = ttk.Entry(form)
-        ttk.Label(form, text="Odometer (KM)").grid(row=0, column=5)
-        self.odometer_entry.grid(row=1, column=5, padx=5)
+        self.odometer_entry.grid(row=1, column=4, padx=5)
+
+        ttk.Label(form, text="VIN").grid(row=0, column=5)
+        self.vin_entry = ttk.Entry(form)
+        self.vin_entry.grid(row=1, column=5, padx=5)
+        self.vin_status = ttk.Label(form, text="", foreground="green")
+        self.vin_status.grid(row=1, column=7, padx=5)
+
+        ttk.Button(form, text="Decode VIN", command=self._decode_vin).grid(row=1, column=6, padx=5)
+
 
         btns = ttk.Frame(self)
         btns.pack(pady=10)
@@ -173,3 +181,45 @@ class VehicleFrame(BaseFrame):
     def _clear_filter(self):
         self.search_var.delete(0, "end")
         self.refresh_data()
+
+    def _decode_vin(self):
+        vin = self.vin_entry.get().strip()
+        if not vin or len(vin) < 11:
+            messagebox.showerror("Invalid VIN", "Please enter a valid VIN (at least 11 characters).")
+            return
+
+        try:
+            url = f"https://vpic.nhtsa.dot.gov/api/vehicles/decodevinvalues/{vin}?format=json"
+            response = requests.get(url, timeout=5)
+            response.raise_for_status()
+            results = response.json()["Results"][0]
+
+            make = results.get("Make", "").strip()
+            model = results.get("Model", "").strip()
+            year = results.get("ModelYear", "").strip()
+
+            self.make_entry.config(state="normal")
+            self.model_entry.config(state="normal")
+            self.year_entry.config(state="normal")
+
+            self.make_entry.delete(0, "end")
+            self.model_entry.delete(0, "end")
+            self.year_entry.delete(0, "end")
+
+            self.make_entry.insert(0, make)
+            self.model_entry.insert(0, model)
+            self.year_entry.insert(0, year)
+
+            self.make_entry.config(state="readonly")
+            self.model_entry.config(state="readonly")
+            self.year_entry.config(state="readonly")
+
+            if not any([make, model, year]):
+                self.vin_status.config(text="❌ Not Found", foreground="red")
+                messagebox.showinfo("No Match", "No vehicle data was found for that VIN.")
+            else:
+                self.vin_status.config(text="✅ Decoded", foreground="green")
+        except Exception as e:
+                self.vin_status.config(text="❌ Error", foreground="red")
+                messagebox.showerror("Decode Error", f"Could not decode VIN: {e}")
+

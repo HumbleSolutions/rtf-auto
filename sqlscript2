@@ -1,7 +1,0 @@
-import sqlite3
-
-conn = sqlite3.connect("rtf_auto.db")
-cursor = conn.cursor()
-cursor.execute("ALTER TABLE work_order_parts ADD COLUMN cost REAL DEFAULT 0.0")
-conn.commit()
-conn.close()

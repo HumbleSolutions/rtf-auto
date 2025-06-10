@@ -29,32 +29,38 @@ class AppController:
 
         self.show_frame(LoginFrame)
 
-    def show_frame(self, frame_class):
+    def show_frame(self, frame_class, *args, **kwargs):
+        """
+        Instantiate and raise frame_class(self.root, self, *args, **kwargs).
+        """
         if frame_class not in self.frames:
             try:
-                frame = frame_class(self.root, self)
+                # Pass along any positional or keyword args (e.g. mode, entity_id)
+                frame = frame_class(self.root, self, *args, **kwargs)
                 self.frames[frame_class] = frame
                 frame.place(x=0, y=0, relwidth=1, relheight=1)
 
-                # ✅ Prevent duplicate widgets (e.g., multiple Treeviews)
+                # Only run setup_ui once per frame instance
                 if not hasattr(frame, "ui_initialized"):
                     frame.setup_ui()
                     frame.ui_initialized = True
 
-            except Exception as e:
+            except Exception:
                 import traceback
-                print(f"[ERROR] Failed to load frame: {frame_class.__name__}")
                 traceback.print_exc()
+                print(f"[ERROR] Failed to load frame: {frame_class.__name__}")
                 return
 
+        # Raise the frame
         frame = self.frames[frame_class]
         frame.tkraise()
+
+        # If the frame has a refresh_data method, call it
         if hasattr(frame, "refresh_data") and callable(frame.refresh_data):
             try:
                 frame.refresh_data()
             except Exception as e:
                 print("[Frame Refresh Error]", e)
-
 
     def logout(self):
         if os.path.exists(SESSION_FILE):

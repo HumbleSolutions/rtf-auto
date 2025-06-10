@@ -43,6 +43,8 @@ class CustomerFrame(BaseFrame):
         ttk.Button(btns, text="Update", command=self._update_customer).grid(row=0, column=1, padx=5)
         ttk.Button(btns, text="Delete", command=self._delete_customer).grid(row=0, column=2, padx=5)
         ttk.Button(btns, text="Refresh", command=self.refresh_data).grid(row=0, column=3, padx=5)
+        ttk.Button(self, text="📜 History",
+        command=self.open_history).pack(pady=5)
 
     def refresh_data(self):
         for row in self.tree.get_children():
@@ -105,6 +107,11 @@ class CustomerFrame(BaseFrame):
         if confirm:
             DBManager().delete_customer(cust_id)
             self.refresh_data()
-
-
-# Repeat similar back-button structure for VehicleFrame, WorkOrderFrame, CalendarFrame...
+    def open_history(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Select Customer", "Please select a customer first.")
+            return
+        cid = self.tree.item(selected[0])["values"][0]
+        from view.history_frame import HistoryFrame
+        self.controller.show_frame(HistoryFrame, mode="customer", entity_id=cid)

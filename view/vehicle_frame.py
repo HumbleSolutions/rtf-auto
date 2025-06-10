@@ -62,6 +62,8 @@ class VehicleFrame(BaseFrame):
         ttk.Button(btns, text="Add", command=self._add_vehicle).grid(row=0, column=0, padx=5)
         ttk.Button(btns, text="Update", command=self._update_vehicle).grid(row=0, column=1, padx=5)
         ttk.Button(btns, text="Delete", command=self._delete_vehicle).grid(row=0, column=2, padx=5)
+        ttk.Button(self, text="📜 History",
+        command=self.open_history).pack(pady=5)
         
 
     def refresh_data(self):
@@ -265,3 +267,11 @@ class VehicleFrame(BaseFrame):
             self.vin_status.config(text="✅ Cached" if cached else "✅ Decoded", foreground="green")
 
 
+    def open_history(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Select Vehicle", "Please select a vehicle first.")
+            return
+        vid = self.tree.item(selected[0])["values"][0]
+        from view.history_frame import HistoryFrame
+        self.controller.show_frame(HistoryFrame, mode="vehicle", entity_id=vid)

@@ -17,6 +17,18 @@ class DBManager:
         conn = self.get_connection()
         cursor = conn.cursor()
 
+        # model/db_manager.py (inside DBManager._run_migrations)
+
+# —— ensure work_orders has odometer_km ——  
+        cursor.execute("PRAGMA table_info(work_orders)")
+        cols = [col[1] for col in cursor.fetchall()]
+        if "odometer_km" not in cols:
+            cursor.execute("""
+                ALTER TABLE work_orders
+                ADD COLUMN odometer_km INTEGER DEFAULT 0
+            """)
+
+
         cursor.execute("PRAGMA table_info(vehicles)")
         columns = [col[1] for col in cursor.fetchall()]
         if "odometer_km" not in columns:
@@ -401,3 +413,44 @@ class DBManager:
         """, (vin, make, model, year))
         conn.commit()
         conn.close()
+
+    def get_history_by_vehicle(self, vehicle_id):
+        conn = self.get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT
+              w.id,
+              w.created_at,
+              COALESCE(NULLIF(w.odometer_km, 0), v.odometer_km) AS km,
+              w.issue,
+              w.notes,
+              w.status
+            FROM work_orders w
+            JOIN vehicles v ON w.vehicle_id = v.id
+            WHERE w.vehicle_id = ?
+            ORDER BY datetime(w.created_at) DESC
+        """, (vehicle_id,))
+        rows = cur.fetchall()
+        conn.close()
+        return rows
+
+    def get_history_by_customer(self, customer_id):
+        conn = self.get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT
+              w.id,
+              w.created_at,
+              v.make, v.model, v.year,
+              COALESCE(NULLIF(w.odometer_km, 0), v.odometer_km) AS km,
+              w.issue,
+              w.notes,
+              w.status
+            FROM work_orders w
+            JOIN vehicles v ON w.vehicle_id = v.id
+            WHERE v.customer_id = ?
+            ORDER BY datetime(w.created_at) DESC
+        """, (customer_id,))
+        rows = cur.fetchall()
+        conn.close()
+        return rows
